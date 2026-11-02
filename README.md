@@ -1,5 +1,7 @@
 # Nikonect 0.4.0
 
+基于 Vibe Coding 打造的
+
 独立 Android USB Host / PTP 相机 App，新增实验性 Wi-Fi PTP/IP，目标 Nikon Z50（第一代）。工程在 `D:\Nikonect`，Kotlin + Jetpack Compose，支持 Android 10 及以上。
 
 0.4.0 增加 Nikon 自动 ISO 控制值读取、统一底部导航与左右滑动、顶部可隐藏工具栏（+ 菜单）、相机目录浏览、JPG 对应 NEF 手动下载、手机照片导入、垃圾桶恢复和永久删除。保留 USB 16 KiB 兼容读取。完整步骤和限制见 [0.4.0 说明](docs/RELEASE_0.4.0.md)。
