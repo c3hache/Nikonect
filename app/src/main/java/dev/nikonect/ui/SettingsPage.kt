@@ -30,6 +30,7 @@ internal fun SettingsPage(controller: CameraController, state: CameraState) {
                 { SettingChoice("预览解码尺寸", "较小尺寸降低手机解码负担", s.previewSize, listOf(640 to "640 · 省电", 960 to "960 · 流畅", 1280 to "1280 · 均衡", 1600 to "1600 · 清晰")) { value -> controller.updateSettings { it.copy(previewSize = value) } } },
                 { SettingChoice("构图网格", "仅叠加在监看画面", s.grid, GridMode.entries.map { it to it.label }) { value -> controller.updateSettings { it.copy(grid = value) } } },
                 { SettingToggle("亮度直方图", "根据预览图采样，每秒约 3 次", s.histogram) { value -> controller.updateSettings { it.copy(histogram = value) } } },
+                { SettingToggle("触摸对焦", "轻点监看画面移动对焦点并对焦", s.touchFocus) { value -> controller.updateSettings { it.copy(touchFocus = value) } } },
                 { SettingToggle("监看优先", "监看时暂停传图与卡片扫描", s.prioritizeLive) { value -> controller.updateSettings { it.copy(prioritizeLive = value) } } },
                 { SettingToggle("监看使用横屏", "其他页面恢复自动旋转", s.landscapeMonitor) { value -> controller.updateSettings { it.copy(landscapeMonitor = value) } } }
             )
@@ -53,7 +54,7 @@ internal fun SettingsPage(controller: CameraController, state: CameraState) {
                 { SettingToggle("实验性 Nikon 取景", "允许尝试相机未公布的取景操作", s.experimentalLive) { value -> controller.updateSettings { it.copy(experimentalLive = value) } } },
                 { Column(Modifier.padding(12.dp)) { Text("运行诊断"); Text("导出帧率、USB/解码耗时及连接日志", style = MaterialTheme.typography.bodySmall); TextButton(onClick = controller::exportDiagnostics) { Text("导出到 Download/Nikonect") } } },
                 { Column(Modifier.padding(12.dp)) { Text("最近状态", style = MaterialTheme.typography.titleSmall); Text(state.status, style = MaterialTheme.typography.bodySmall, maxLines = 3) } },
-                { Column(Modifier.padding(12.dp)) { Text("Nikonect 0.7.1 · 已接收 ${state.downloaded} 个文件", style = MaterialTheme.typography.bodySmall); TextButton(onClick = { reset = true }) { Text("恢复默认设置") } } }
+                { Column(Modifier.padding(12.dp)) { Text("Nikonect 0.8.0 · 已接收 ${state.downloaded} 个文件", style = MaterialTheme.typography.bodySmall); TextButton(onClick = { reset = true }) { Text("恢复默认设置") } } }
             )
         }
         SettingsGrid(entries)

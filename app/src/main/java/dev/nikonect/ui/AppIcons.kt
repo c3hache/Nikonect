@@ -13,7 +13,7 @@ import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.unit.dp
 import kotlin.math.*
 
-enum class UiIcon { TUNE, MONITOR, GALLERY, SETTINGS, CAMERA, REFRESH, DISCONNECT, ADD, REMOVE, PLAY, STOP, GRID, HISTOGRAM, MORE, ROTATE, FULLSCREEN, DOWNLOAD, SHARE, CLOSE, BEFORE, NEXT, INFO, DELETE, CHECK, WIFI, HIDE, FOLDER, RESTORE, PHONE, WRENCH }
+enum class UiIcon { TUNE, MONITOR, GALLERY, SETTINGS, CAMERA, REFRESH, DISCONNECT, ADD, REMOVE, PLAY, STOP, GRID, HISTOGRAM, MORE, ROTATE, FULLSCREEN, DOWNLOAD, SHARE, CLOSE, BEFORE, NEXT, INFO, DELETE, CHECK, WIFI, HIDE, FOLDER, RESTORE, PHONE, UTURN, WRENCH }
 private fun PathBuilder.line(x1: Float, y1: Float, x2: Float, y2: Float) { moveTo(x1, y1); lineTo(x2, y2) }
 private fun PathBuilder.box(x1: Float, y1: Float, x2: Float, y2: Float) { moveTo(x1, y1); lineTo(x2, y1); lineTo(x2, y2); lineTo(x1, y2); close() }
 private fun PathBuilder.circle(cx: Float, cy: Float, radius: Float) {
@@ -27,6 +27,11 @@ private val vectors = UiIcon.entries.associateWith { symbol ->
     ImageVector.Builder(symbol.name, 24.dp, 24.dp, 24f, 24f).apply {
         path(fill = null, stroke = SolidColor(Color.Black), strokeLineWidth = 1.8f, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) {
             when (symbol) {
+                UiIcon.UTURN -> {
+                    moveTo(4f, 10f); lineTo(9f, 5f); lineTo(14f, 10f)
+                    moveTo(9f, 6f); lineTo(9f, 15f)
+                    curveTo(9f, 22f, 20f, 22f, 20f, 15f); lineTo(20f, 8f)
+                }
                 UiIcon.WRENCH -> {
                     moveTo(20f, 4f); lineTo(16f, 8f); lineTo(13f, 5f); lineTo(16f, 2f)
                     curveTo(10f, 1f, 8f, 7f, 10f, 11f); lineTo(3f, 18f)

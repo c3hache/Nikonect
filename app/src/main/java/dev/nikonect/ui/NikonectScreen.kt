@@ -67,7 +67,7 @@ fun NikonectScreen(controller: CameraController = viewModel()) {
                 Box(Modifier.weight(1f).fillMaxWidth()) {
                     val destination = page
                     screenStates.SaveableStateProvider(destination) {
-                        if (destination == 0) MonitorPage(controller, state, onNavigate = navigate, onBack = { if (history.size > 1) history = ArrayList(history.dropLast(1)) else navigate(1) })
+                        if (destination == 0) MonitorPage(controller, state, onNavigate = navigate)
                         else Column(Modifier.fillMaxSize()) {
                             if (!landscape) Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Text("NIKONECT / ${pages[destination]}", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleMedium)

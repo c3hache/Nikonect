@@ -18,15 +18,18 @@ data class AppSettings(
     val autoStartLive: Boolean = false,
     val landscapeMonitor: Boolean = false,
     val pauseInBackground: Boolean = true,
+    val touchFocus: Boolean = true,
     val experimentalLive: Boolean = false
 ) {
     fun save(p: SharedPreferences) { p.edit().apply {
+        putBoolean("touchFocus", touchFocus)
         putInt("fps", targetFps); putInt("size", previewSize); putBoolean("histogram", histogram); putBoolean("fill", fillPreview); putString("grid", grid.name)
         putBoolean("autoImport", autoImport); putBoolean("nef", importNef); putBoolean("priority", prioritizeLive); putInt("poll", pollSeconds)
         putBoolean("screen", keepScreenOn); putBoolean("immersive", immersive); putBoolean("autoStart", autoStartLive); putBoolean("landscape", landscapeMonitor); putBoolean("background", pauseInBackground); putBoolean("experimental", experimentalLive)
     }.apply() }
     companion object {
         fun load(p: SharedPreferences) = AppSettings(
+            touchFocus = p.getBoolean("touchFocus", true),
             targetFps = p.getInt("fps", 30).takeIf { it in listOf(15, 24, 30) } ?: 30,
             previewSize = p.getInt("size", 960).takeIf { it in listOf(640, 960, 1280, 1600) } ?: 960,
             histogram = p.getBoolean("histogram", true), fillPreview = p.getBoolean("fill", false),

@@ -218,7 +218,7 @@ class CameraController(private val app: Application) : AndroidViewModel(app) {
         }
     }
     fun disconnect() {
-        connectJob?.cancel(); requestedDevice = null
+        albumJob?.cancel(); connectJob?.cancel(); requestedDevice = null
         val s = session
         val attached = connectedDevice == null || connectedDevice?.deviceName in usb.deviceList.keys
         val live = liveJob; val importer = importJob; val sync = propertyJob
@@ -378,35 +378,46 @@ class CameraController(private val app: Application) : AndroidViewModel(app) {
         }
         return result
     }
-    fun refreshCameraFolder() = browseCamera(mutableCameraListing.value.path)
-    fun openCameraFolder(entry: CameraEntry) {
-        if (!entry.folder || entry.token != mediaToken) return
-        browseCamera(mutableCameraListing.value.path + CameraFolder(entry.info.storage, entry.handle, entry.info.filename))
-    }
-    fun cameraFolderBack() = browseCamera(mutableCameraListing.value.path.dropLast(1))
-    private fun browseCamera(path: List<CameraFolder>) = action { s ->
-        pauseForMedia()
+    private var albumJob: Job? = null
+
+    fun refreshCameraFolder(force: Boolean = true) {
+        val s = session ?: return
+        if (albumJob?.isActive == true) return
         val token = mediaToken
-        mutableCameraListing.value = CameraListing(path = path, loading = true, status = "正在读取相机目录…")
-        try {
-            val entries = if (path.isEmpty()) {
-                requireOperation(Ptp.STORAGE_IDS)
-                Reader(s.execute(Ptp.STORAGE_IDS, dataIn = true)).array32().mapIndexed { index, storage ->
-                    CameraEntry(token, -1, ObjectInfo(0x3001, 0, "存储卡 ${index + 1}", storage, 0), true)
+        albumJob = viewModelScope.launch {
+            mutableCameraListing.update { it.copy(loading = true, status = "正在读取存储卡…") }
+            try {
+                pauseForMedia()
+                val previous = if (force) emptyMap() else mutableCameraListing.value.entries.filter { it.token == token }.associateBy { it.handle }
+                val ids = cameraLock.withLock {
+                    try {
+                        Reader(s.execute(Ptp.OBJECT_HANDLES, intArrayOf(-1, 0x3801, 0), dataIn = true)).array32()
+                    } catch (e: PtpError) {
+                        if (e.response !in setOf(0x2014, 0x2006, 0x2008, 0x201D)) throw e
+                        handles(s).toList()
+                    }
+                }.distinct().sortedByDescending { it.toUInt() }
+                val found = mutableListOf<CameraEntry>()
+                for (batch in ids.chunked(8)) {
+                    cameraLock.withLock {
+                        check(session === s && mediaToken == token)
+                        for (handle in batch) {
+                            val info = try { previous[handle]?.info ?: objectInfo(s, handle) } catch (e: PtpError) {
+                                if (e.response == 0x2009) continue else throw e
+                            }
+                            if (ImportPolicy.isJpeg(info.filename)) found += CameraEntry(token, handle, info)
+                        }
+                    }
+                    if (session !== s) return@launch
+                    mutableCameraListing.value = CameraListing(entries = found.toList(), loading = true, status = "已找到 ${found.size} 张")
+                    yield()
                 }
-            } else {
-                requireOperation(Ptp.OBJECT_HANDLES); requireOperation(Ptp.OBJECT_INFO)
-                val folder = path.last()
-                folderObjects(s, folder.storage, folder.handle).filter { it.second.format == 0x3001 || ImportPolicy.isJpeg(it.second.filename) }
-                    .map { CameraEntry(token, it.first, it.second) }
-                    .sortedWith(compareBy<CameraEntry> { !it.folder }.thenByDescending { it.info.filename })
-            }
-            if (session === s) mutableCameraListing.value = CameraListing(entries, path, status = "${entries.size} 项 · JPG 与文件夹；NEF 可在 JPG 中单独传输")
-        } catch (e: Exception) {
-            mutableCameraListing.value = CameraListing(path = path, status = "读取失败：${e.message}")
-            throw e
+                if (session === s) mutableCameraListing.value = CameraListing(entries = found, status = "${found.size} 张照片")
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { if (session === s) mutableCameraListing.update { it.copy(loading = false, status = "读取失败：${e.message}") } }
         }
     }
+
     private suspend fun checkEntry(s: PtpSession, entry: CameraEntry) {
         check(entry.token == mediaToken && session === s && !entry.folder) { "相机连接已变化，请刷新相册" }
         val actual = objectInfo(s, entry.handle)
@@ -418,7 +429,8 @@ class CameraController(private val app: Application) : AndroidViewModel(app) {
         try {
             val cache = File(app.cacheDir, "camera_${entry.token}_${entry.info.storage}_${entry.handle}_${if (full) "full" else "thumb"}.jpg")
             if (!cache.exists()) cameraLock.withLock {
-                checkEntry(s, entry)
+                check(session === s && entry.token == mediaToken)
+                if (full) checkEntry(s, entry)
                 if (full) {
                     requireOperation(Ptp.GET_OBJECT)
                     mutableState.update { it.copy(transferring = true) }
@@ -438,6 +450,21 @@ class CameraController(private val app: Application) : AndroidViewModel(app) {
         pauseForMedia(); checkEntry(s, entry)
         check(ImportPolicy.isJpeg(entry.info.filename))
         importObject(s, entry.handle, entry.info, manual = true)
+    }
+    fun downloadCameraBatch(entries: List<CameraEntry>) = action { s ->
+        pauseForMedia()
+        var done = 0
+        var failed = 0
+        for (entry in entries.distinctBy { it.key }) {
+            try {
+                checkEntry(s, entry)
+                check(ImportPolicy.isJpeg(entry.info.filename))
+                importObject(s, entry.handle, entry.info, manual = true)
+                done++
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { if (!s.healthy || session !== s) throw e; failed++ }
+        }
+        report("批量下载：已处理 $done 张，失败 $failed 张")
     }
     fun downloadCameraNef(entry: CameraEntry) = action { s ->
         pauseForMedia(); checkEntry(s, entry); downloadPairedNef(s, entry.info)
@@ -620,6 +647,7 @@ class CameraController(private val app: Application) : AndroidViewModel(app) {
     }
 
     fun focusAt(x: Int, y: Int) = action { s ->
+        if (!state.value.settings.touchFocus) return@action
         check(state.value.live) { "请先打开监看" }
         requireOperation(0x9205)
         requireOperation(0x90C1)
@@ -716,7 +744,7 @@ class CameraController(private val app: Application) : AndroidViewModel(app) {
                 val snapshot = state.value
                 val info = snapshot.info
                 val content = buildString {
-                    appendLine("Nikonect 0.7.1 / Android ${Build.VERSION.SDK_INT}")
+                    appendLine("Nikonect 0.8.0 / Android ${Build.VERSION.SDK_INT}")
                     appendLine("${info?.manufacturer} ${info?.model} ${info?.version}")
                     appendLine("Operations: " + info?.operations?.sorted()?.joinToString { "0x%04X".format(it) })
                     appendLine("Properties: " + info?.properties?.sorted()?.joinToString { "0x%04X".format(it) })

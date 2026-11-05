@@ -23,7 +23,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.nikonect.camera.*
 
 @Composable
-internal fun MonitorPage(controller: CameraController, state: CameraState, onNavigate: (Int) -> Unit, onBack: () -> Unit) {
+internal fun MonitorPage(controller: CameraController, state: CameraState, onNavigate: (Int) -> Unit) {
     val frame by controller.preview.collectAsStateWithLifecycle()
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
     if (settingsOpen && state.connected) SdkSettingsDialog(controller, state) { settingsOpen = false }
@@ -41,7 +41,7 @@ internal fun MonitorPage(controller: CameraController, state: CameraState, onNav
         val wide = maxWidth > maxHeight
         frame?.let { Image(it.bitmap.asImageBitmap(), "相机实时画面", Modifier.fillMaxSize(), contentScale = if (state.settings.fillPreview) ContentScale.Crop else ContentScale.Fit) }
         val latestFrame by rememberUpdatedState(frame)
-        if (state.live) Box(Modifier.fillMaxSize().pointerInput(state.settings.fillPreview) {
+        if (state.live && state.settings.touchFocus) Box(Modifier.fillMaxSize().pointerInput(state.settings.fillPreview) {
             detectTapGestures { tap ->
                 val f = latestFrame ?: return@detectTapGestures
                 val aspect = f.bitmap.width.toFloat() / f.bitmap.height
@@ -81,7 +81,7 @@ internal fun MonitorPage(controller: CameraController, state: CameraState, onNav
         }
         Column(Modifier.align(Alignment.TopEnd).padding(6.dp)) {
             Row(Modifier.height(42.dp).background(Color(0xDE162522), RoundedCornerShape(22.dp)), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onBack) { AppIcon(UiIcon.BEFORE, "离开监看") }
+                IconButton(onClick = { onNavigate(1) }) { AppIcon(UiIcon.UTURN, "返回参数页") }
                 if (expanded) {
                     Box {
                         IconButton(onClick = { gridMenu = true }) { AppIcon(UiIcon.GRID, "选择构图网格") }
@@ -93,6 +93,8 @@ internal fun MonitorPage(controller: CameraController, state: CameraState, onNav
                 if (expanded) Box {
                     IconButton(onClick = { more = true }) { AppIcon(UiIcon.WRENCH, "监看设置") }
                     DropdownMenu(more, onDismissRequest = { more = false }) {
+                        DropdownMenuItem(text = { Text("触摸对焦") }, trailingIcon = { Switch(state.settings.touchFocus, null) },
+                            onClick = { controller.updateSettings { it.copy(touchFocus = !it.touchFocus) } })
                         DropdownMenuItem(text = { Text("全部相机参数") }, enabled = state.connected, onClick = { more = false; settingsOpen = true })
                         DropdownMenuItem(text = { Text(if (infoVisible) "隐藏画面参数" else "显示画面参数") }, onClick = { infoVisible = !infoVisible; more = false })
                         DropdownMenuItem(text = { Text(if (state.settings.landscapeMonitor) "恢复自动旋转" else "横屏监看") }, onClick = { more = false; controller.updateSettings { it.copy(landscapeMonitor = !it.landscapeMonitor) } })
@@ -107,7 +109,7 @@ internal fun MonitorPage(controller: CameraController, state: CameraState, onNav
         if (frame != null && infoVisible && state.settings.histogram) Histogram(frame?.histogram ?: IntArray(64), Modifier.align(Alignment.TopStart).padding(start = 12.dp, top = 10.dp).width(if (wide) 160.dp else 115.dp).height(if (wide) 65.dp else 55.dp))
         if (notice.isNotEmpty()) Text(if (state.status.startsWith("操作失败")) state.status else notice,
             Modifier.align(Alignment.CenterStart).background(Color.Black.copy(alpha=.65f)).padding(6.dp), color = Color.White)
-        if (state.connected) Column(Modifier.align(Alignment.BottomCenter).padding(6.dp).widthIn(max = 600.dp).fillMaxWidth().background(Color(0xDD162522), RoundedCornerShape(18.dp))) {
+        if (state.connected) Column(Modifier.align(Alignment.BottomCenter).padding(6.dp).widthIn(max = 600.dp).fillMaxWidth()) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 if (infoVisible) listOf(0x500D to "快门", 0x5007 to "光圈", 0x500F to "ISO", 0x5010 to "补偿").forEach { (code, label) ->
                     TextButton(onClick = { propertyCode = code }, modifier = Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 2.dp, vertical = 6.dp)) {
